@@ -1,8 +1,8 @@
 'use client'
 
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useState, useRef, useImperativeHandle, forwardRef, useMemo, useCallback } from 'react'
 import { createClient } from '@/lib/supabase'
-import { Trash2, ExternalLink, Globe, Bookmark as BookmarkIcon, Loader2 } from 'lucide-react'
+import { Trash2, ExternalLink, Globe, Bookmark as BookmarkIcon } from 'lucide-react'
 
 type Bookmark = {
   id: string
@@ -11,127 +11,88 @@ type Bookmark = {
   created_at: string
 }
 
-export default function BookmarkList({ userId }: { userId: string }) {
+export interface BookmarkListRef {
+  refreshBookmarks: () => Promise<void>
+}
+
+const BookmarkList = forwardRef<BookmarkListRef, { userId: string }>(({ userId }, ref) => {
   const [bookmarks, setBookmarks] = useState<Bookmark[]>([])
   const [loading, setLoading] = useState(true)
-  const supabase = useRef(createClient()).current
+  const supabase = useMemo(() => createClient(), [])
+
+ const fetchBookmarks = useCallback(async () => {
+  setLoading(true)
+
+  const { data, error } = await supabase
+    .from('bookmarks')
+    .select('id,title,url,created_at')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false })
+
+  if (!error && data) {
+    setBookmarks(data)
+  } else {
+    console.error(error)
+  }
+
+  setLoading(false)
+}, [supabase, userId])
+
+
+  // Expose refresh method to parent
+  useImperativeHandle(ref, () => ({
+    refreshBookmarks: fetchBookmarks
+  }))
+
+ useEffect(() => {
+  const load = async () => {
+    await fetchBookmarks()
+  }
+
+  load()
+
+  const channel = supabase
+  .channel(`bookmarks-${userId}`)
+  .on(
+    'postgres_changes',
+    {
+      event: '*',
+      schema: 'public',
+      table: 'bookmarks',
+      filter: `user_id=eq.${userId}`,
+    },
+    async () => {
+      await fetchBookmarks()
+    }
+  )
+  .subscribe((status) => {
+    console.log('Realtime status:', status)
+  })
+
+
+  return () => {
+    supabase.removeChannel(channel)
+  }
+}, [fetchBookmarks, supabase, userId])
+
+
 
   const handleDelete = async (id: string) => {
-    // 1. SILENT UPDATE (Optimistic UI)
-    // We store the current state in case we need to roll back
-    const previousBookmarks = [...bookmarks];
-    
-    // Immediately remove from UI so the user feels it's instant
-    setBookmarks((prev) => prev.filter((b) => b.id !== id));
+    const previousBookmarks = [...bookmarks]
+    setBookmarks((prev) => prev.filter((b) => b.id !== id))
 
-    // 2. BACKGROUND SYNC
     const { error } = await supabase
       .from('bookmarks')
       .delete()
       .eq('id', id)
-      .eq('user_id', userId);
+      .eq('user_id', userId)
 
     if (error) {
-      console.error('Background delete failed:', error.message);
-      // Rollback: Put the bookmarks back if the DB rejected the delete
-      setBookmarks(previousBookmarks);
-      alert("Sync failed. The bookmark was restored.");
+      console.error('Delete failed:', error.message)
+      setBookmarks(previousBookmarks)
+      alert('Delete failed. Please try again.')
     }
   }
-
-  useEffect(() => {
-    const fetchInitial = async () => {
-      try {
-        const { data, error } = await supabase
-          .from('bookmarks')
-          .select('*')
-          .eq('user_id', userId)
-          .order('created_at', { ascending: false })
-        
-        if (error) {
-          console.error('Error fetching bookmarks:', error);
-          return;
-        }
-        
-        if (data) {
-          setBookmarks(data);
-          console.log('Initial bookmarks loaded:', data.length);
-        }
-      } catch (err) {
-        console.error('Fetch error:', err);
-      } finally {
-        setLoading(false);
-      }
-    }
-
-    fetchInitial();
-
-    // REALTIME SUBSCRIPTION - Listen for all changes
-    const channel = supabase
-      .channel(`realtime-bookmarks-${userId}`, {
-        config: { broadcast: { self: true } }
-      })
-      .on(
-        'postgres_changes', 
-        { 
-          event: 'INSERT',
-          schema: 'public', 
-          table: 'bookmarks', 
-          filter: `user_id=eq.${userId}` 
-        }, 
-        (payload) => {
-          console.log('INSERT event received:', payload.new);
-          const newItem = payload.new as Bookmark;
-          setBookmarks((prev) => {
-            // Prevent duplicates
-            if (prev.find(b => b.id === newItem.id)) return prev;
-            return [newItem, ...prev];
-          });
-        }
-      )
-      .on(
-        'postgres_changes', 
-        { 
-          event: 'UPDATE',
-          schema: 'public', 
-          table: 'bookmarks', 
-          filter: `user_id=eq.${userId}` 
-        }, 
-        (payload) => {
-          console.log('UPDATE event received:', payload.new);
-          const updatedItem = payload.new as Bookmark;
-          setBookmarks((prev) => 
-            prev.map(b => b.id === updatedItem.id ? updatedItem : b)
-          );
-        }
-      )
-      .on(
-        'postgres_changes', 
-        { 
-          event: 'DELETE',
-          schema: 'public', 
-          table: 'bookmarks', 
-          filter: `user_id=eq.${userId}` 
-        }, 
-        (payload) => {
-          console.log('DELETE event received:', payload.old.id);
-          setBookmarks((prev) => prev.filter((b) => b.id !== payload.old.id));
-        }
-      )
-      .subscribe((status) => {
-        console.log('Realtime subscription status:', status);
-        if (status === 'SUBSCRIBED') {
-          console.log('Successfully subscribed to realtime updates');
-        } else if (status === 'CLOSED' || status === 'CHANNEL_ERROR') {
-          console.error('Realtime subscription failed. Check Realtime settings in Supabase.');
-        }
-      });
-
-    return () => {
-      console.log('Cleaning up realtime subscription');
-      supabase.removeChannel(channel);
-    }
-  }, [userId, supabase])
 
   if (loading) return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 animate-pulse">
@@ -195,4 +156,8 @@ export default function BookmarkList({ userId }: { userId: string }) {
       )}
     </div>
   )
-}
+})
+
+BookmarkList.displayName = 'BookmarkList'
+
+export default BookmarkList

@@ -4,9 +4,12 @@ import { useState, useRef } from 'react'
 import { createClient } from '@/lib/supabase'
 import { Plus, Link as LinkIcon, Type, Loader2 } from 'lucide-react'
 
-type Props = { userId: string }
+type Props = { 
+  userId: string
+  onSuccess?: () => void | Promise<void>
+}
 
-export default function BookmarkForm({ userId }: Props) {
+export default function BookmarkForm({ userId, onSuccess }: Props) {
   const supabaseRef = useRef(createClient())
   const [title, setTitle] = useState('')
   const [url, setUrl] = useState('')
@@ -15,16 +18,13 @@ export default function BookmarkForm({ userId }: Props) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!title.trim() || !url.trim()) {
-      setError('Please fill in both fields');
-      return;
-    }
+    if (!title.trim() || !url.trim()) return
 
     try {
       setLoading(true)
       setError(null)
 
-      const { data, error: insertError } = await supabaseRef.current
+      const { error: insertError } = await supabaseRef.current
         .from('bookmarks')
         .insert([
           { 
@@ -35,25 +35,28 @@ export default function BookmarkForm({ userId }: Props) {
         ])
         .select()
 
-      if (insertError) {
-        console.error('Insert Error:', insertError);
-        throw insertError;
-      }
-
-      if (data && data.length > 0) {
-        console.log('Bookmark created successfully:', data[0]);
-      }
+      if (insertError) throw insertError
 
       // Clear form on success
       setTitle('')
       setUrl('')
-      setError(null)
-    } catch (err: any) {
-      console.error('Bookmark creation failed:', err)
-      setError(err.message || 'Failed to create bookmark. Check RLS policies.')
-    } finally {
-      setLoading(false)
-    }
+
+      // Call the callback to refresh the list
+      if (onSuccess) {
+        await onSuccess()
+      }
+    } catch (err: unknown) {
+  if (err instanceof Error) {
+    console.error('Insert Error:', err.message)
+    setError(err.message)
+  } else {
+    console.error('Insert Error:', err)
+    setError('Check your Supabase RLS policies')
+  }
+} finally {
+  setLoading(false)
+}
+
   }
 
   return (
@@ -66,7 +69,7 @@ export default function BookmarkForm({ userId }: Props) {
             placeholder="Bookmark title..."
             value={title}
             onChange={(e) => setTitle(e.target.value)}
-            className="w-full pl-10 pr-4 py-2.5 bg-transparent text-sm outline-none"
+            className="w-full pl-10 pr-4 py-2.5 bg-transparent text-sm outline-none text-slate-900"
             disabled={loading}
             required
           />
@@ -78,7 +81,7 @@ export default function BookmarkForm({ userId }: Props) {
             placeholder="Paste URL..."
             value={url}
             onChange={(e) => setUrl(e.target.value)}
-            className="w-full pl-10 pr-4 py-2.5 bg-transparent text-sm outline-none"
+            className="w-full pl-10 pr-4 py-2.5 bg-transparent text-sm outline-none text-slate-900"
             disabled={loading}
             required
           />

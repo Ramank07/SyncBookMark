@@ -1,52 +1,55 @@
-import { createServerClient } from '@supabase/ssr'
-import { cookies } from 'next/headers'
-import { redirect } from 'next/navigation'
+// import { createServerClient } from '@supabase/ssr'
+// import { cookies } from 'next/headers'
 
-import BookmarkForm from './components/BookmarkForm'
-import BookmarkList from './components/BookmarkList'
+import { redirect } from 'next/navigation'
+import { createSupabaseServer } from '@/lib/supabaseServer'
+
+import BookmarkContainer from './components/BookmarkContainer'
 import Navbar from './components/Navbar'
 
 export default async function Home() {
-  const cookieStore = await cookies()
+  // const cookieStore = await cookies()
 
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        getAll() {
-          return cookieStore.getAll()
-        },
-        setAll(cookiesToSet) {
-          try {
-            cookiesToSet.forEach(({ name, value, options }) =>
-              cookieStore.set(name, value, options)
-            )
-          } catch { /* Safe to ignore in Server Components */ }
-        },
-      },
-    }
-  )
+  // const supabase = createServerClient(
+  //   process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  //   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+  //   {
+  //     cookies: {
+  //       getAll() {
+  //         return cookieStore.getAll()
+  //       },
+  //       setAll(cookiesToSet) {
+  //         try {
+  //           cookiesToSet.forEach(({ name, value, options }) =>
+  //             cookieStore.set(name, value, options)
+  //           )
+  //         } catch { /* Safe to ignore in Server Components */ }
+  //       },
+  //     },
+  //   }
+  // )
+  const supabase = await createSupabaseServer()
 
   const { data: { user } } = await supabase.auth.getUser()
 
   async function signIn() {
     'use server'
-    const cookieStore = await cookies()
-    const supabaseServer = createServerClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-      {
-        cookies: {
-          getAll() { return cookieStore.getAll() },
-          setAll(cookiesToSet) {
-            cookiesToSet.forEach(({ name, value, options }) =>
-              cookieStore.set(name, value, options)
-            )
-          },
-        },
-      }
-    )
+    // const cookieStore = await cookies()
+    // const supabaseServer = createServerClient(
+    //   process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    //   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    //   {
+    //     cookies: {
+    //       getAll() { return cookieStore.getAll() },
+    //       setAll(cookiesToSet) {
+    //         cookiesToSet.forEach(({ name, value, options }) =>
+    //           cookieStore.set(name, value, options)
+    //         )
+    //       },
+    //     },
+    //   }
+    // )
+    const supabaseServer = await createSupabaseServer()
 
     const { data, error } = await supabaseServer.auth.signInWithOAuth({
       provider: 'google',
@@ -62,21 +65,22 @@ export default async function Home() {
   // ✅ NEW LOGOUT SERVER ACTION
   async function signOut() {
     'use server'
-    const cookieStore = await cookies()
-    const supabaseServer = createServerClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-      {
-        cookies: {
-          getAll() { return cookieStore.getAll() },
-          setAll(cookiesToSet) {
-            cookiesToSet.forEach(({ name, value, options }) =>
-              cookieStore.set(name, value, options)
-            )
-          },
-        },
-      }
-    )
+    // const cookieStore = await cookies()
+    // const supabaseServer = createServerClient(
+    //   process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    //   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    //   {
+    //     cookies: {
+    //       getAll() { return cookieStore.getAll() },
+    //       setAll(cookiesToSet) {
+    //         cookiesToSet.forEach(({ name, value, options }) =>
+    //           cookieStore.set(name, value, options)
+    //         )
+    //       },
+    //     },
+    //   }
+    // )
+    const supabaseServer = await createSupabaseServer()
     await supabaseServer.auth.signOut()
     return redirect('/')
   }
@@ -107,10 +111,7 @@ export default async function Home() {
     <main className="min-h-screen bg-slate-50/50">
       <div className="max-w-4xl mx-auto p-6">
         <Navbar user={user} signOut={signOut} />
-        <div className="mt-8 space-y-8">
-          <BookmarkForm userId={user.id} />
-          <BookmarkList userId={user.id} />
-        </div>
+        <BookmarkContainer userId={user.id} />
       </div>
     </main>
   )
