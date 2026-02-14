@@ -1,5 +1,6 @@
 // import { createServerClient } from '@supabase/ssr'
 // import { cookies } from 'next/headers'
+export const dynamic = 'force-dynamic'
 
 import { redirect } from 'next/navigation'
 import { createSupabaseServer } from '@/lib/supabaseServer'
