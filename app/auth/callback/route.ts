@@ -9,7 +9,11 @@ export async function GET(request: Request) {
 
   const supabase = await createSupabaseServer()
 
-  await supabase.auth.exchangeCodeForSession(code)
+  const { error } = await supabase.auth.exchangeCodeForSession(code)
+
+  if (error) {
+    console.error('AUTH CALLBACK ERROR:', error.message)
+  }
 
   return NextResponse.redirect(url.origin)
 }
