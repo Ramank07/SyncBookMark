@@ -1,5 +1,6 @@
 // import { createServerClient } from '@supabase/ssr'
 // import { cookies } from 'next/headers'
+export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
 import { redirect } from 'next/navigation'
@@ -7,6 +8,8 @@ import { createSupabaseServer } from '@/lib/supabaseServer'
 
 import BookmarkContainer from './components/BookmarkContainer'
 import Navbar from './components/Navbar'
+import { createServerClient } from '@supabase/ssr'
+import { cookies } from 'next/headers'
 
 export default async function Home() {
   // const cookieStore = await cookies()
@@ -31,7 +34,9 @@ export default async function Home() {
   // )
   const supabase = await createSupabaseServer()
 
-  const { data: { user } } = await supabase.auth.getUser()
+const { data: { session } } = await supabase.auth.getSession()
+const user = session?.user ?? null
+
 
   async function signIn() {
     'use server'
@@ -56,6 +61,7 @@ export default async function Home() {
       provider: 'google',
       options: {
         redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL}/auth/callback`,
+        // redirectTo: 'http://localhost:3000/auth/callback',
       },
     })
 
@@ -64,27 +70,16 @@ export default async function Home() {
   }
 
   // ✅ NEW LOGOUT SERVER ACTION
-  async function signOut() {
-    'use server'
-    // const cookieStore = await cookies()
-    // const supabaseServer = createServerClient(
-    //   process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    //   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    //   {
-    //     cookies: {
-    //       getAll() { return cookieStore.getAll() },
-    //       setAll(cookiesToSet) {
-    //         cookiesToSet.forEach(({ name, value, options }) =>
-    //           cookieStore.set(name, value, options)
-    //         )
-    //       },
-    //     },
-    //   }
-    // )
-    const supabaseServer = await createSupabaseServer()
-    await supabaseServer.auth.signOut()
-    return redirect('/')
-  }
+async function signOut() {
+  'use server'
+
+  const supabase = await createSupabaseServer()
+  await supabase.auth.signOut()
+
+  redirect('/')
+}
+
+
 
   if (!user) {
     return (
