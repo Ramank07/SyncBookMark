@@ -36,8 +36,13 @@ export default async function Home() {
   //   }
   // )
   const supabase = await createSupabaseServer()
+  const cookieStore = await cookies()
+console.log('--- SERVER COOKIE DEBUG ---')
+console.log(cookieStore.getAll())
 
 const { data: { session } } = await supabase.auth.getSession()
+console.log('--- SESSION DEBUG ---')
+console.log(session)
 const user = session?.user ?? null
 
 
