@@ -1,7 +1,5 @@
 // import { createServerClient } from '@supabase/ssr'
 // import { cookies } from 'next/headers'
-import { headers } from 'next/headers'
-headers()
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
